@@ -101,7 +101,7 @@ trait TPCHQueries extends Benchmark {
           |   s_name,
           |   p_partkey
           |limit 100
-        """.stripMargin)
+        """.stripMargin),
 
      ("tpch3",
         """
@@ -151,6 +151,7 @@ trait TPCHQueries extends Benchmark {
           |order by
           | o_orderpriority
         """.stripMargin),
+
       ("tpch4",
         """
           |select
@@ -429,7 +430,7 @@ trait TPCHQueries extends Benchmark {
           |                sum(ps_supplycost * ps_availqty) > max(V)
           |order by
           |        value desc
-        """.stripMargin
+        """.stripMargin),
 
       ("tpch12",
         """select
@@ -995,8 +996,8 @@ trait TPCHQueries extends Benchmark {
           |        cntrycode
         """.stripMargin)
 
-      ).filter {case (name. _) => name.endsWith("orig") }
+      ).filter { case (name, _) => !name.endsWith("orig") }
         .map { case (name, sqlText) =>
           Query(name = name, sqlText = sqlText, description = "", executionMode = ForeachResults)
-   }
+        }
 }
