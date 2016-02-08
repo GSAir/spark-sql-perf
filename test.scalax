@@ -1,0 +1,13 @@
+import com.databricks.spark.sql.perf.tpch.Tables
+import com.databricks.spark.sql.perf.tpch.TPCH
+import java.io._
+
+val tables = new Tables(sqlContext, "", 1)
+tables.createTemporaryTables("/home/greg/Research/delite-playground/data", "com.databricks.spark.csv")
+
+
+val tpch = new TPCH()
+val experiment = tpch.runExperiment(tpch.tpch)
+
+val file = new PrintWriter("result.html")
+file.println(experiment.html)
