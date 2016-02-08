@@ -49,7 +49,7 @@ abstract class Benchmark(
   val resultsLocation =
     sqlContext.getAllConfs.getOrElse(
       "spark.sql.perf.results",
-      "/spark/sql/performance")
+      "./performance")
 
   protected def sparkContext = sqlContext.sparkContext
 

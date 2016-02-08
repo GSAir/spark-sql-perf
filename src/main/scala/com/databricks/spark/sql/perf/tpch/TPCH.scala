@@ -25,26 +25,10 @@ import org.apache.spark.sql.SQLContext
  * TPC-DS benchmark's dataset.
  * @param sqlContext An existing SQLContext.
  */
-class TPCDS
+class TPCH
   extends Benchmark
   with TPCHQueries
   with Serializable {
-
-  /*
-  def setupBroadcast(skipTables: Seq[String] = Seq("store_sales", "customer")) = {
-    val skipExpr = skipTables.map(t => !('tableName === t)).reduceLeft[Column](_ && _)
-    val threshold =
-      allStats
-        .where(skipExpr)
-        .select(max('sizeInBytes))
-        .first()
-        .getLong(0)
-    val setQuery = s"SET spark.sql.autoBroadcastJoinThreshold=$threshold"
-
-    println(setQuery)
-    sql(setQuery)
-  }
-  */
 
   /**
    * Simple utilities to run the queries without persisting the results.
