@@ -22,7 +22,7 @@ trait TPCHQueries extends Benchmark {
 
   import ExecutionMode._
 
-   val tpch = Seq(
+   val tpch_string = Seq(
      ("tpch1",
         """
           |select
@@ -996,7 +996,16 @@ trait TPCHQueries extends Benchmark {
           |        cntrycode
         """.stripMargin)
 
-      ).filter { case (name, _) => !name.endsWith("orig") }
+      )
+
+      val tpch = tpch_string.filter { case (name, _) => !name.endsWith("orig") }
+        .map { case (name, sqlText) =>
+          Query(name = name, sqlText = sqlText, description = "", executionMode = ForeachResults)
+        }
+
+      val delite_support = Seq(1, 3, 4, 5, 6, 9, 10, 12, 13, 14, 16).map { n => f"tpch$n%d" }
+
+      val tpch_delite = tpch_string.filter { case (name, _) => delite_support.contains(name) }
         .map { case (name, sqlText) =>
           Query(name = name, sqlText = sqlText, description = "", executionMode = ForeachResults)
         }

@@ -6,6 +6,6 @@ val folder = sys.env("DELITE_PLAY") + "/data/"
 val tables = new Tables(sqlContext, "", 1)
 tables.createTemporaryTables(folder, "com.databricks.spark.csv")
 
-
 val tpch = new TPCH()
-val experiment = tpch.runExperiment(tpch.tpch, variations = Seq(tpch.delite))
+System.out.println(tpch.delite_support)
+val experiment = tpch.runExperiment(tpch.tpch_delite, variations = Seq(tpch.delite))
