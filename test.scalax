@@ -8,4 +8,4 @@ tables.createTemporaryTables(folder, "com.databricks.spark.csv")
 
 
 val tpch = new TPCH()
-val experiment = tpch.runExperiment(tpch.tpch)
+val experiment = tpch.runExperiment(tpch.tpch, variations = Seq(tpch.delite))

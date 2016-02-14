@@ -33,6 +33,8 @@ import org.apache.spark.{SparkContext, SparkEnv}
 
 import com.databricks.spark.sql.perf.cpu._
 
+import playground._
+
 /**
  * A collection of queries that test a particular aspect of Spark SQL.
  *
@@ -102,6 +104,10 @@ abstract class Benchmark(
   val tungsten = Variation("tungsten", Seq("on", "off")) {
     case "off" => sqlContext.setConf("spark.sql.tungsten.enabled", "false")
     case "on" => sqlContext.setConf("spark.sql.tungsten.enabled", "true")
+  }
+
+  val delite = Variation("delite", Seq("on", "off")) {
+    case _ => Unit
   }
 
   /**
@@ -557,8 +563,15 @@ abstract class Benchmark(
         val optimizationTime = measureTimeMs {
           queryExecution.optimizedPlan
         }
-        val planningTime = measureTimeMs {
-          queryExecution.executedPlan
+
+        val planningTime = if (!description.contains("delite=on")) {
+          measureTimeMs {
+            queryExecution.executedPlan
+          }
+        } else {
+          0
+          // measureTimeMs {
+          // }
         }
 
         val breakdownResults = if (includeBreakdown) {
@@ -598,22 +611,28 @@ abstract class Benchmark(
         // The executionTime for the entire query includes the time of type conversion
         // from catalyst to scala.
         var result: Option[Long] = None
-        val executionTime = measureTimeMs {
-          executionMode match {
-            case ExecutionMode.CollectResults => dataFrame.rdd.collect()
-            case ExecutionMode.ForeachResults => dataFrame.rdd.foreach { row => Unit }
-            case ExecutionMode.WriteParquet(location) =>
-              dataFrame.saveAsParquetFile(s"$location/$name.parquet")
-            case ExecutionMode.HashResults =>
-              val columnStr = dataFrame.schema.map(_.name).mkString(",")
-              // SELECT SUM(HASH(col1, col2, ...)) FROM (benchmark query)
-              val row =
-                dataFrame
-                  .selectExpr(s"hash($columnStr) as hashValue")
-                  .groupBy()
-                  .sum("hashValue")
-                  .head()
-              result = if (row.isNullAt(0)) None else Some(row.getLong(0))
+        val executionTime = if (!description.contains("delite=on")) {
+          measureTimeMs {
+            executionMode match {
+              case ExecutionMode.CollectResults => dataFrame.rdd.collect()
+              case ExecutionMode.ForeachResults => dataFrame.rdd.foreach { row => Unit }
+              case ExecutionMode.WriteParquet(location) =>
+                dataFrame.saveAsParquetFile(s"$location/$name.parquet")
+              case ExecutionMode.HashResults =>
+                val columnStr = dataFrame.schema.map(_.name).mkString(",")
+                // SELECT SUM(HASH(col1, col2, ...)) FROM (benchmark query)
+                val row =
+                  dataFrame
+                    .selectExpr(s"hash($columnStr) as hashValue")
+                    .groupBy()
+                    .sum("hashValue")
+                    .head()
+                result = if (row.isNullAt(0)) None else Some(row.getLong(0))
+            }
+          }
+        } else {
+          measureTimeMs {
+            Run.runDelite(queryExecution.optimizedPlan)
           }
         }
 
