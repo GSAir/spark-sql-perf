@@ -124,7 +124,8 @@ abstract class Benchmark(
       iterations: Int = 3,
       variations: Seq[Variation[_]] = Seq(Variation("StandardRun", Seq("true")) { _ => {} }),
       tags: Map[String, String] = Map.empty,
-      timeout: Long = 0L) = {
+      timeout: Long = 0L,
+      outputfolder: String = "") = {
 
     class ExperimentStatus {
       val currentResults = new collection.mutable.ArrayBuffer[BenchmarkResult]()
@@ -153,7 +154,7 @@ abstract class Benchmark(
       }
 
       val timestamp = System.currentTimeMillis()
-      val resultPath = s"$resultsLocation/timestamp=$timestamp"
+      val resultPath = if (outputfolder.equals("")) s"$resultsLocation/timestamp=$timestamp" else s"$resultsLocation/$outputfolder"
       val combinations = cartesianProduct(variations.map(l => (0 until l.options.size).toList).toList)
       val resultsFuture = Future {
 

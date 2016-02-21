@@ -268,8 +268,7 @@ trait TPCHQueries extends Benchmark {
           |   when all_nations.nation = 'BRAZIL'
           |   then volume
           |   else 0
-          | end),
-          | sum(volume) as mkt_share
+          | end) / sum(volume) as mkt_share
           |from (
           | select
           |   year(o_orderdate) as o_year,
