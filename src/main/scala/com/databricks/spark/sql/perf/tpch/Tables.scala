@@ -179,16 +179,42 @@ class Tables(sqlContext: SQLContext, dbgenDir: String, scaleFactor: Int) extends
       }
     }
 
-    def createTemporaryTable(location: String, format: String): Unit = {
-      println(s"Creating temporary table $name using data stored in $location.")
-      logInfo(s"Creating temporary table $name using data stored in $location.")
-      sqlContext.read.format(format)
-        .option("delimiter", "|")
-        .option("header", "false") // use first line of all files as header
-        .option("inferschema", "false") // automatically infer data types
-        .schema(schema)
-        .load(location).registerTempTable(name)
+    def createTemporaryTable(location: String, format: String, cached: Boolean): Unit = {
+      val table = format match {
+        case "parquet" =>
+          val parquet_location = location.replace(".tbl", ".parquet")
+          if (!new java.io.File(parquet_location).exists) {
+            println(s"Creating parquet file for $name stored in $location.")
+            logInfo(s"Creating parquet file for $name stored in $location.")
+            val table = sqlContext.read.format("com.databricks.spark.csv")
+              .option("delimiter", "|")
+              .option("header", "false") // use first line of all files as header
+              .option("inferschema", "false") // automatically infer data types
+              .schema(schema)
+              .load(location)
+            table.write.parquet(parquet_location)
+          }
+          println(s"Creating temporary table $name using data stored in $parquet_location.")
+          logInfo(s"Creating temporary table $name using data stored in $parquet_location.")
+
+          sqlContext.read.parquet(parquet_location)
+      case _ =>
+          sqlContext.read.format(format)
+            .option("delimiter", "|")
+            .option("header", "false") // use first line of all files as header
+            .option("inferschema", "false") // automatically infer data types
+            .schema(schema)
+            .load(location)
+      }
+      println(s"Creating temporary table $name using data stored in $location (cached: $cached).")
+      logInfo(s"Creating temporary table $name using data stored in $location (cached: $cached).")
+
+      table.registerTempTable(name)
+      if (cached) {
+        table.cache()
+      }
     }
+
   }
 
   def genData(
@@ -243,7 +269,7 @@ class Tables(sqlContext: SQLContext, dbgenDir: String, scaleFactor: Int) extends
     logInfo(s"The current database has been set to $databaseName.")
   }
 
-  def createTemporaryTables(location: String, format: String, tableFilter: String = ""): Unit = {
+  def createTemporaryTables(location: String, format: String, tableFilter: String = "", cached: Boolean = false): Unit = {
     val filtered = if (tableFilter.isEmpty) {
       tables
     } else {
@@ -251,7 +277,7 @@ class Tables(sqlContext: SQLContext, dbgenDir: String, scaleFactor: Int) extends
     }
     filtered.foreach { table =>
       val tableLocation = s"$location/${table.name}.tbl"
-      table.createTemporaryTable(tableLocation, format)
+      table.createTemporaryTable(tableLocation, format, cached)
     }
   }
 

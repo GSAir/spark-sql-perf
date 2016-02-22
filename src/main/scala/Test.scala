@@ -9,7 +9,7 @@ import java.util.Calendar
 
 object Test {
   val usage = """
-  Usage: dspark [iterations num] [sf num] [queries filter*]
+  Usage: dspark [iterations num] [sf num] [queries filter*] [format [ parquet | ... ]] [cached]
   """
 
   def main(args: Array[String]): Unit = {
@@ -18,8 +18,6 @@ object Test {
     type OptionMap = Map[Symbol, Any]
     val tpch = new TPCH()
 
-    val ooo = tpch.sqlContext.sparkContext.getConf.getAll.length
-    println(s"Length: $ooo")
     tpch.sqlContext.sparkContext.getConf.getAll foreach {
       case (a, b) => println(s"$a: $b")
     }
@@ -34,6 +32,10 @@ object Test {
           nextOption(map + ('sf -> value.toInt), tail)
         case "appname" :: value :: tail =>
           nextOption(map + ('appname -> value), tail)
+        case "format" :: value :: tail =>
+          nextOption(map + ('format -> value), tail)
+        case "cached" :: tail =>
+          nextOption(map + ('cached -> true), tail)
         // case "queries" :: value :: tail =>
         //   val filter = value.split(",")
         //   nextOption(map + ('queries -> tpch.tpch.filter { case Query(name, _, _, _) => filter.contains(name) }), tail)
@@ -43,13 +45,15 @@ object Test {
       }
     }
 
-    val defaultoption = Map('iterations -> 5.asInstanceOf[Any], 'sf -> 1.asInstanceOf[Any] ,'appname -> "Spark-Perf".asInstanceOf[Any] )
+    val defaultoption = Map('iterations -> 5.asInstanceOf[Any], 'sf -> 1.asInstanceOf[Any] ,'appname -> "Spark-Perf".asInstanceOf[Any], 'format -> "csv".asInstanceOf[Any], 'cached -> false.asInstanceOf[Any] )
     val options = nextOption(defaultoption.asInstanceOf[OptionMap], arglist)
     println("Option used:")
 
     options foreach {case (a, b) => println(" " + a + "\n\t: " + b)}
 
-    val folder = sys.env("DELITE_PLAY") + "/data/SF" + (options apply 'sf).toString
+    val sf = (options apply 'sf).asInstanceOf[Int]
+
+    val folder = sys.env("DELITE_PLAY") + f"/data/SF$sf%d"
     println(folder)
     if (!Files.exists(Paths.get(folder))) {
       println(s"[ERROR] $folder folder doesn't exists")
@@ -57,13 +61,17 @@ object Test {
     }
 
     val today = Calendar.getInstance().getTime()
-    val outputfolder = "spark_sf" + (options apply 'sf).toString + "_" + today.toString.replace(" ", "_")
+    val date = today.toString.replace(" ", "_")
+    val format = (options apply 'format).toString
+    val cached = (options apply 'cached).asInstanceOf[Boolean]
+
+    val outputfolder = f"spark_sf$sf%d_$date%s_$format%s_$cached%b"
     println(outputfolder)
 
     val tables = new Tables(tpch.sqlContext, "", 1)
-    tables.createTemporaryTables(folder, "com.databricks.spark.csv")
+    tables.createTemporaryTables(folder, format, cached = cached)
 
-    val experiment = tpch.runExperiment(tpch.tpch, iterations = (options getOrElse ('iterations, 3)).asInstanceOf[Int], outputfolder = outputfolder)
+    val experiment = tpch.runExperiment(tpch.tpch, iterations = (options apply 'iterations).asInstanceOf[Int], outputfolder = outputfolder)
 
     experiment.waitForFinish(7 * 24 * 3600)
   }
