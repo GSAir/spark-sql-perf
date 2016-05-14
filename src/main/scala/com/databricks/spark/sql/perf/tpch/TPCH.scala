@@ -22,11 +22,11 @@ import com.databricks.spark.sql.perf._
 import org.apache.spark.sql.SQLContext
 
 /**
- * TPC-DS benchmark's dataset.
+ * TPC-H benchmark's dataset.
  * @param sqlContext An existing SQLContext.
  */
-class TPCH
-  extends Benchmark
+class TPCH (sqlContext: SQLContext)
+  extends Benchmark (sqlContext)
   with TPCHQueries
   with Serializable {
 

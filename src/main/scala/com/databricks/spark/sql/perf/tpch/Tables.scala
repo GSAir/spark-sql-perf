@@ -179,7 +179,7 @@ class Tables(sqlContext: SQLContext, dbgenDir: String, scaleFactor: Int) extends
       }
     }
 
-    def createTemporaryTable(location: String, format: String, cached: Boolean): Unit = {
+    def createTemporaryTable(location: String, format: String): Unit = {
       val table = format match {
         case "parquet" =>
           val parquet_location = location.replace(".tbl", ".parquet")
@@ -206,13 +206,10 @@ class Tables(sqlContext: SQLContext, dbgenDir: String, scaleFactor: Int) extends
             .schema(schema)
             .load(location)
       }
-      println(s"Creating temporary table $name using data stored in $location (cached: $cached).")
-      logInfo(s"Creating temporary table $name using data stored in $location (cached: $cached).")
+      println(s"Creating temporary table $name using data stored in $location.")
+      logInfo(s"Creating temporary table $name using data stored in $location.")
 
       table.registerTempTable(name)
-      if (cached) {
-        table.cache()
-      }
     }
 
   }
@@ -269,7 +266,7 @@ class Tables(sqlContext: SQLContext, dbgenDir: String, scaleFactor: Int) extends
     logInfo(s"The current database has been set to $databaseName.")
   }
 
-  def createTemporaryTables(location: String, format: String, tableFilter: String = "", cached: Boolean = false): Unit = {
+  def createTemporaryTables(location: String, format: String, tableFilter: String = ""): Unit = {
     val filtered = if (tableFilter.isEmpty) {
       tables
     } else {
@@ -277,7 +274,7 @@ class Tables(sqlContext: SQLContext, dbgenDir: String, scaleFactor: Int) extends
     }
     filtered.foreach { table =>
       val tableLocation = s"$location/${table.name}.tbl"
-      table.createTemporaryTable(tableLocation, format, cached)
+      table.createTemporaryTable(tableLocation, format)
     }
   }
 

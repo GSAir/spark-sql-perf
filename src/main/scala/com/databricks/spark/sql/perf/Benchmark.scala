@@ -32,6 +32,7 @@ import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.{SparkContext, SparkEnv}
 
 import com.databricks.spark.sql.perf.cpu._
+import playground._
 
 /**
  * A collection of queries that test a particular aspect of Spark SQL.
@@ -104,6 +105,17 @@ abstract class Benchmark(
     case "on" => sqlContext.setConf("spark.sql.tungsten.enabled", "true")
   }
 
+  val preload = Variation("preload", Seq("true")) {
+    case _ => {}
+  }
+
+  val delite = Variation("delite", Seq("true")) {
+    case _ => {}
+  }
+
+  val delitepre = Variation("delitepre", Seq("true")) {
+    case _ => {}
+  }
   /**
    * Starts an experiment run with a given set of executions to run.
    * @param executionsToRun a list of executions to run.
@@ -125,7 +137,8 @@ abstract class Benchmark(
       variations: Seq[Variation[_]] = Seq(Variation("StandardRun", Seq("true")) { _ => {} }),
       tags: Map[String, String] = Map.empty,
       timeout: Long = 0L,
-      outputfolder: String = "") = {
+      outputfolder: String = "",
+      cached: Boolean = false) = {
 
     class ExperimentStatus {
       val currentResults = new collection.mutable.ArrayBuffer[BenchmarkResult]()
@@ -558,9 +571,13 @@ abstract class Benchmark(
         val optimizationTime = measureTimeMs {
           queryExecution.optimizedPlan
         }
-        val planningTime = measureTimeMs {
-          queryExecution.executedPlan
-        }
+
+        val planningTime = if (!description.contains("delite"))
+            measureTimeMs {
+              queryExecution.executedPlan
+            }
+          else
+            0
 
         val breakdownResults = if (includeBreakdown) {
           val depth = queryExecution.executedPlan.collect { case p: SparkPlan => p }.size
@@ -594,27 +611,47 @@ abstract class Benchmark(
           Seq.empty[BreakdownResult]
         }
 
+        if (description.contains("preload=true")) {
+          queryExecution.logical.collect {
+              case UnresolvedRelation(t, _) =>
+                t.table
+          }.distinct.foreach {
+            case name =>
+              val start = System.currentTimeMillis()
+              sqlContext.table(name).persist().count()
+              val delta = System.currentTimeMillis() - start
+              println(s"$name loaded in $delta")
+          }
+        }
+
+
         // The executionTime for the entire query includes the time of type conversion from catalyst
         // to scala.
         // The executionTime for the entire query includes the time of type conversion
         // from catalyst to scala.
         var result: Option[Long] = None
-        val executionTime = measureTimeMs {
-          executionMode match {
-            case ExecutionMode.CollectResults => dataFrame.rdd.collect()
-            case ExecutionMode.ForeachResults => dataFrame.rdd.foreach { row => Unit }
-            case ExecutionMode.WriteParquet(location) =>
-              dataFrame.saveAsParquetFile(s"$location/$name.parquet")
-            case ExecutionMode.HashResults =>
-              val columnStr = dataFrame.schema.map(_.name).mkString(",")
-              // SELECT SUM(HASH(col1, col2, ...)) FROM (benchmark query)
-              val row =
-                dataFrame
-                  .selectExpr(s"hash($columnStr) as hashValue")
-                  .groupBy()
-                  .sum("hashValue")
-                  .head()
-              result = if (row.isNullAt(0)) None else Some(row.getLong(0))
+        val executionTime = if (!description.contains("delite")) {
+          measureTimeMs {
+            executionMode match {
+              case ExecutionMode.CollectResults => dataFrame.rdd.collect()
+              case ExecutionMode.ForeachResults => dataFrame.rdd.foreach { row => Unit }
+              case ExecutionMode.WriteParquet(location) =>
+                dataFrame.saveAsParquetFile(s"$location/$name.parquet")
+              case ExecutionMode.HashResults =>
+                val columnStr = dataFrame.schema.map(_.name).mkString(",")
+                // SELECT SUM(HASH(col1, col2, ...)) FROM (benchmark query)
+                val row =
+                  dataFrame
+                    .selectExpr(s"hash($columnStr) as hashValue")
+                    .groupBy()
+                    .sum("hashValue")
+                    .head()
+                result = if (row.isNullAt(0)) None else Some(row.getLong(0))
+            }
+          }
+        } else {
+          measureTimeMs {
+            Run.runDelite(queryExecution.optimizedPlan, description.contains("delitepre"))
           }
         }
 
